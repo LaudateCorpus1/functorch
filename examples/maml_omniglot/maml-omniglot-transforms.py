@@ -34,16 +34,11 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch import nn
 import torch
-import matplotlib.pyplot as plt
 import argparse
 import time
 import functools
 
-import pandas as pd
 import numpy as np
-import matplotlib as mpl
-mpl.use('Agg')
-plt.style.use('bmh')
 
 
 # Squash the warning spam
@@ -89,18 +84,18 @@ def main():
     inplace_relu = True
     net = nn.Sequential(
         nn.Conv2d(1, 64, 3),
-        nn.GroupNorm(32, 64, affine=True),
+        nn.BatchNorm2d(64, momentum=1, affine=True, track_running_stats=False),
         nn.ReLU(inplace=inplace_relu),
         nn.MaxPool2d(2, 2),
         nn.Conv2d(64, 64, 3),
-        nn.GroupNorm(32, 64, affine=True),
+        nn.BatchNorm2d(64, momentum=1, affine=True, track_running_stats=False),
         nn.ReLU(inplace=inplace_relu),
         nn.MaxPool2d(2, 2),
         nn.Conv2d(64, 64, 3),
-        nn.GroupNorm(32, 64, affine=True),
+        nn.BatchNorm2d(64, momentum=1, affine=True, track_running_stats=False),
         nn.ReLU(inplace=inplace_relu),
         nn.MaxPool2d(2, 2),
-        Flatten(),
+        nn.Flatten(),
         nn.Linear(64, args.n_way)).to(device)
 
     net.train()
@@ -118,7 +113,6 @@ def main():
     for epoch in range(100):
         train(db, [params, buffers, fnet], device, meta_opt, epoch, log)
         test(db, [params, buffers, fnet], device, epoch, log)
-        plot(log)
 
 
 # Trains a model for n_inner_iter using the support and returns a loss
@@ -237,34 +231,6 @@ def test(db, net, device, epoch, log):
         'mode': 'test',
         'time': time.time(),
     })
-
-
-def plot(log):
-    # Generally you should pull your plotting code out of your training
-    # script but we are doing it here for brevity.
-    df = pd.DataFrame(log)
-
-    fig, ax = plt.subplots(figsize=(6, 4))
-    train_df = df[df['mode'] == 'train']
-    test_df = df[df['mode'] == 'test']
-    ax.plot(train_df['epoch'], train_df['acc'], label='Train')
-    ax.plot(test_df['epoch'], test_df['acc'], label='Test')
-    ax.set_xlabel('Epoch')
-    ax.set_ylabel('Accuracy')
-    ax.set_ylim(70, 100)
-    fig.legend(ncol=2, loc='lower right')
-    fig.tight_layout()
-    fname = 'maml-accs.png'
-    print(f'--- Plotting accuracy to {fname}')
-    fig.savefig(fname)
-    plt.close(fig)
-
-
-# Won't need this after this PR is merged in:
-# https://github.com/pytorch/pytorch/pull/22245
-class Flatten(nn.Module):
-    def forward(self, input):
-        return input.view(input.size(0), -1)
 
 
 if __name__ == '__main__':
